@@ -2,6 +2,7 @@ import pygame, random, sys
 from pygame._sdl2 import Window
 import math
 
+#initialisation du jeu
 pygame.init()
 pygame.display.set_caption("entité")
 
@@ -11,12 +12,14 @@ thirdwidth = display_info.current_w/3
 thirdheight = display_info.current_h/3
 
 surface = pygame.display.set_mode((thirdwidth, thirdheight))
-
 clock = pygame.time.Clock()
+
 blinkcount = 0
 blinktick, animationtick = pygame.time.get_ticks(), pygame.time.get_ticks()
 safepos = random.randint(0,8)
+dangerrects = [(0,0), (thirdwidth/3, 0), (thirdwidth/3*2-1,0), (0,thirdheight/3),(0,thirdheight/3*2),(thirdwidth/3,thirdheight/3),(thirdwidth/3,thirdheight/3*2),(thirdwidth/3*2-1,thirdheight/3*2),(thirdwidth/3*2-1,thirdheight/3)]
 level = 1
+screenshake = True
 blinking = False
 blinking_phase = True
 death = False
@@ -29,19 +32,19 @@ icq = pygame.image.load("ICQ.png")
 icq = pygame.transform.scale(icq, (100, 100))
 emoticonlist = [aol,msn,icq]
 emoticoncount = 0
-ballcolor = (75,175,75)
 background = (255,255,255)
 window = Window.from_display_module()
-arial24 = pygame.font.SysFont("arial",50)
-gameover = arial24.render("GAME OVER", True, (255, 0, 0))
-youwin = arial24.render("YOU WIN", True, (0, 255, 0))
+arial = pygame.font.SysFont("arial",50)
+gameover = arial.render("GAME OVER", True, (255, 0, 0))
+youwin = arial.render("YOU WIN", True, (0, 255, 0))
 window.position = (display_info.current_w/2-thirdwidth/2,display_info.current_h/2-thirdheight/2)
-dangerrects = [(0,0), (thirdwidth/3, 0), (thirdwidth/3*2-1,0), (0,thirdheight/3),(0,thirdheight/3*2),(thirdwidth/3,thirdheight/3),(thirdwidth/3,thirdheight/3*2),(thirdwidth/3*2-1,thirdheight/3*2),(thirdwidth/3*2-1,thirdheight/3)]
 
+# gestion de mouvement
 def movement():
-    global continuer, left, right, up, down
+    global death, continuer, left, right, up, down
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
+            death = True
             continuer = False
            
     touchesPressees = pygame.key.get_pressed()
@@ -68,7 +71,8 @@ def movement():
     if touchesPressees[pygame.K_DOWN]  and not down and window.position[1] < thirdheight*2:
         window.position = (window.position[0], window.position[1] + thirdheight)
         down = True
-       
+
+#teste si le joueur est dans une case "safe"
 def is_player_safe():
     for rects in range(len(dangerrects)):
         if rects == safepos:
@@ -77,8 +81,9 @@ def is_player_safe():
                     return True
     return False
 
+# gère le "blink" des rectangles, éxécute certains évènements au fil du jeu
 def memory():
-    global safepos, blinking, blinktick, blinkcount, blinking_phase, level, ballcolor, continuer, background
+    global safepos, blinking, blinktick, blinkcount, blinking_phase, level, continuer, background, screenshake, previousposition, death
     tickmemory = pygame.time.get_ticks()
     
     if tickmemory - blinktick >= 500/level:
@@ -98,23 +103,33 @@ def memory():
                 if not is_player_safe():
                     death = True
                     continuer = False
-                safepos = random.randint(0, 8)
-                level += 0.1
-    if level >= 3.0:
+                safepos = random.randint(0,8)
+                level += 0.2
+    if level >= 8.0:
         continuer = False
-    elif level >= 2.5:
-        ballcolor = (255,255,255)
-        background = (0,0,0)
-#        window.position = (window.position[0]+random.randint(-1,1),window.position[1]+random.randint(-1,1))
-    elif level >= 1.3:
-        ballcolor = (255,0,0)
+    elif level >= 6.0:
+        background = (100,100,100)
+        # fait "trembler" l'écran
+        if screenshake:
+            previousposition = window.position
+            window.position = (window.position[0]+random.randint(-2,2),window.position[1]+random.randint(-2,2))
+        else:
+            window.position = previousposition
+        screenshake = not screenshake
+    elif level >= 1.6:
+        background = (150,150,150)
         
+# joue automatiquement (ne fait pas partie du jeu, facilite la présentation)
+def autoplay():
+    window.position = (dangerrects[safepos][0]*3,dangerrects[safepos][1]*3)
+
+# dessine
 def draw():
-    global surface, dangerrect, blinking, ballcolor, emoticoncount, emoticonlist, animationtick
+    global surface, dangerrect, blinking, emoticoncount, emoticonlist, animationtick
     surface.fill(background)
     surface.blit(emoticonlist[emoticoncount],(thirdwidth/2-50, thirdheight/2-50))
     tickani = pygame.time.get_ticks()
-    if tickani - animationtick >= 100:
+    if tickani - animationtick >= 100/level*2:
         emoticoncount += 1
         animationtick = tickani
         if emoticoncount > 2:
@@ -129,14 +144,17 @@ def draw():
                 pygame.draw.rect(surface, (90,90,90), dangerrect, width=0)
 
     pygame.display.flip()
-   
+    
+# boucle principale
 continuer = True
 while continuer:
     movement()
     memory()
     draw()
-
-if not death:
+#    autoplay() (cette partie sera éxécutée pendant la présentation)
+    
+# fin du jeu: teste si le joueur a gagné
+if death:
     surface.fill((255,255,255))
     surface.blit(gameover,(thirdwidth/2-150, thirdheight/2-25))
     pygame.display.flip()
